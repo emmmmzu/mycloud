@@ -54,6 +54,7 @@ func handleStat(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(jsonFile))
 }
 
+// Entry point of the Server
 func main() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
