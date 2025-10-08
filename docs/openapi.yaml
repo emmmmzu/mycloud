@@ -1,0 +1,14 @@
+#POST /auth/login 
+#   Login authentication (username/password)
+
+#GET /list?path=... 
+#   Shows Files/Folders inside specified directory on Server (file name, size, modified time, type)
+
+#GET /stat?path=... 
+#   Returns metadata of one single file or folder
+
+#GET /download/{path} 
+#   Download Files/Folders from Server or to read and preview a file
+
+#POST /upload/{path} 
+#   Upload Files to Server
