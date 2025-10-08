@@ -11,6 +11,7 @@ type Response struct {
 	Status  string `json:"status"`
 }
 
+// Lists the data of a directory
 func handleList(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	path := query.Get("path")
@@ -30,6 +31,8 @@ func handleList(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(jsonData))
 }
+
+// Lists the metadata of a file
 func handleStat(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	path := query.Get("path")
@@ -63,6 +66,7 @@ func main() {
 	http.HandleFunc("/stat", handleStat)
 
 	fmt.Println("Starting server at port 8080")
+
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		fmt.Println(err)
 	}
