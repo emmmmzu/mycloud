@@ -1,14 +1,153 @@
-#POST /auth/login 
-#   Login authentication (username/password)
+# Using OpenAPI 3.0.3 instead of 3.1.x because 3.1.x isn't fully supported yet
+openapi: 3.0.3
+info:
+  title: MyCloud API
+  version: 0.1.0
+  description: API for a self-hosted cloud app.
 
-#GET /list?path=... 
-#   Shows Files/Folders inside specified directory on Server (file name, size, modified time, type)
+servers:
+  - url: http://localhost:8080
+    description: Local development server
 
-#GET /stat?path=... 
-#   Returns metadata of one single file or folder
+paths:
+  /auth/login:
+    post:
+      summary: Log into the server
+      description: Log in with username & password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Session token
+        '401':
+          description: Invalid credentials
 
-#GET /download/{path} 
-#   Download Files/Folders from Server or to read and preview a file
+  /list:
+    get:
+      summary: List directory contents
+      description: Lists files and folders inside the specified directory on the server.
+      parameters:
+        - name: path
+          in: query
+          description: Directory path to list
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of files/folders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    type:
+                      type: string
+                      enum: [file, folder]
+                    size:
+                      type: integer
+                    modified:
+                      type: string
+                      format: date-time
 
-#POST /upload/{path} 
-#   Upload Files to Server
+  /stat:
+    get:
+      summary: Get metadata for a single file or folder
+      description: Returns basic stats (type, size, modified time) for a single path.
+      parameters:
+        - name: path
+          in: query
+          description: File or folder path to inspect
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File/folder metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  type:
+                    type: string
+                    enum: [file, folder]
+                  size:
+                    type: integer
+                  modified:
+                    type: string
+                    format: date-time
+        '404':
+          description: Path not found
+
+  /download/{path}:
+    get:
+      summary: Download a file
+      description: Streams the file from the server to the client.
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: File path to download
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: File not found
+
+  /upload/{path}:
+    post:
+      summary: Upload or replace a file
+      description: Sends a file to the server to store at the given path.
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: Destination file path (URL-encoded)
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: File uploaded successfully
+        '400':
+          description: Upload failed
