@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 // Checks if the API works
@@ -129,4 +131,55 @@ func handleStat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(jsonFile))
+}
+
+func handleUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed, use POST")
+		return
+	}
+
+	query := r.URL.Query()
+	path := query.Get("path")
+
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "missing 'path' query parameter")
+		return
+	}
+
+	err := r.ParseMultipartForm(10 << 20) // 10 MB
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to parse form: %v", err))
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to get file: %v", err))
+		return
+	}
+	defer file.Close()
+
+	fullPath := filepath.Join(RootFolder, path, header.Filename)
+
+	dst, err := os.Create(fullPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create file: %v", err))
+		return
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to save file: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":  "file uploaded successfully",
+		"filename": header.Filename,
+		"size":     header.Size,
+	})
+
 }

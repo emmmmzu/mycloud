@@ -18,6 +18,8 @@ func main() {
 
 	http.HandleFunc("/stat", handleStat)
 
+	http.HandleFunc("/upload", handleUpload)
+
 	fmt.Println("Starting server at port 8080")
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
