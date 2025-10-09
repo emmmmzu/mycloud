@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 )
@@ -19,7 +20,7 @@ func handleList(w http.ResponseWriter, r *http.Request) {
 	path := query.Get("path")
 
 	if path == "" {
-		http.Error(w, "No Path Available", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "missing 'path' query parameter")
 		return
 	}
 
@@ -28,23 +29,26 @@ func handleList(w http.ResponseWriter, r *http.Request) {
 	entries, err := os.ReadDir(fullPath)
 
 	if err != nil {
-		http.Error(w, "Path Not Found", http.StatusBadRequest)
+		writeError(w, http.StatusNotFound, fmt.Sprintf("directory not found or inaccessible: %v", err))
 		return
 	}
 
 	fileList := make([]map[string]interface{}, 0)
 
 	for i := 0; i < len(entries); i++ {
-		info, err := entries[i].Info()
+		entry := entries[i]
+
+		info, err := entry.Info()
 
 		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to read file info for '%s': %v", entry.Name(), err))
 			return
 		}
 
-		fileName := entries[i].Name()
+		fileName := entry.Name()
 
 		var fileType string
-		if entries[i].IsDir() {
+		if entry.IsDir() {
 			fileType = "folder"
 		} else {
 			fileType = "file"
@@ -68,6 +72,7 @@ func handleList(w http.ResponseWriter, r *http.Request) {
 	jsonData, err := json.Marshal(fileList)
 
 	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to convert into JSON: %v", err))
 		return
 	}
 
@@ -82,7 +87,7 @@ func handleStat(w http.ResponseWriter, r *http.Request) {
 	path := query.Get("path")
 
 	if path == "" {
-		http.Error(w, "No Path Available", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "missing 'path' query parameter")
 		return
 	}
 
@@ -91,6 +96,7 @@ func handleStat(w http.ResponseWriter, r *http.Request) {
 	info, err := os.Stat(fullPath)
 
 	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("file or folder not found: %v", err))
 		return
 	}
 
@@ -116,6 +122,7 @@ func handleStat(w http.ResponseWriter, r *http.Request) {
 	jsonFile, err := json.Marshal(fileObj)
 
 	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to convert into JSON: %v", err))
 		return
 	}
 

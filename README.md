@@ -9,4 +9,4 @@ cd into the server directory in your terminal
     cd server
 
 and run main.go
-    go run main.go
+    go run .
