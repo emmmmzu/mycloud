@@ -249,3 +249,57 @@ func handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+// Deletes a file
+func handleDelete(w http.ResponseWriter, r *http.Request) {
+	// Checking that only the POST Method is used
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed, use POST")
+		return
+	}
+
+	path := r.FormValue("path")
+
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "missing 'path' query parameter")
+		return
+	}
+
+	fullPath, errPath := safeFolderPath(RootFolder, path)
+	if errPath != nil {
+		writeError(w, http.StatusForbidden, "invalid path")
+		return
+	}
+
+	_, err := os.Stat(fullPath)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "path does not exist")
+	}
+
+	info, err := os.Stat(fullPath)
+
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("file or folder not found: %v", err))
+		return
+	}
+
+	if info.IsDir() {
+		err := os.RemoveAll(fullPath)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Path Error: %v", err))
+			return
+		}
+	} else {
+		err := os.Remove(fullPath)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Path Error: %v", err))
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "deleted successfully",
+		"path":    fullPath,
+	})
+}
