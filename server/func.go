@@ -18,17 +18,20 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 
 // Lists the data of a directory
 func handleList(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	path := query.Get("path")
+	path := r.URL.Query().Get("path")
 
 	if path == "" {
 		writeError(w, http.StatusBadRequest, "missing 'path' query parameter")
 		return
 	}
 
-	fullPath := RootFolder + path
+	folderPath, errPath := safeFolderPath(RootFolder, path)
+	if errPath != nil {
+		writeError(w, http.StatusForbidden, "invalid path")
+		return
+	}
 
-	entries, err := os.ReadDir(fullPath)
+	entries, err := os.ReadDir(folderPath)
 
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("directory not found or inaccessible: %v", err))
@@ -85,17 +88,20 @@ func handleList(w http.ResponseWriter, r *http.Request) {
 
 // Lists the metadata of a file
 func handleStat(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	path := query.Get("path")
+	path := r.URL.Query().Get("path")
 
 	if path == "" {
 		writeError(w, http.StatusBadRequest, "missing 'path' query parameter")
 		return
 	}
 
-	fullPath := RootFolder + path
+	folderPath, errPath := safeFolderPath(RootFolder, path)
+	if errPath != nil {
+		writeError(w, http.StatusForbidden, "invalid path")
+		return
+	}
 
-	info, err := os.Stat(fullPath)
+	info, err := os.Stat(folderPath)
 
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("file or folder not found: %v", err))
@@ -115,7 +121,7 @@ func handleStat(w http.ResponseWriter, r *http.Request) {
 	fileModified := info.ModTime().Format(TimeFormat)
 
 	fileObj := map[string]interface{}{
-		"path":     fullPath,
+		"path":     folderPath,
 		"type":     fileType,
 		"size":     fileSize,
 		"modified": fileModified,
@@ -133,26 +139,35 @@ func handleStat(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(jsonFile))
 }
 
+// Uploads a file
 func handleUpload(w http.ResponseWriter, r *http.Request) {
+	// Checking that only the POST Method is used
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed, use POST")
 		return
 	}
 
-	query := r.URL.Query()
-	path := query.Get("path")
+	path := r.FormValue("path")
 
 	if path == "" {
 		writeError(w, http.StatusBadRequest, "missing 'path' query parameter")
 		return
 	}
 
+	folderPath, errPath := safeFolderPath(RootFolder, path)
+	if errPath != nil {
+		writeError(w, http.StatusForbidden, "invalid path")
+		return
+	}
+
+	// Parsing
 	err := r.ParseMultipartForm(10 << 20) // 10 MB
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to parse form: %v", err))
 		return
 	}
 
+	// Getting the file to upload
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to get file: %v", err))
@@ -160,8 +175,22 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	fullPath := filepath.Join(RootFolder, path, header.Filename)
+	// Creating the full path for the file to get copied into
+	fullPath := filepath.Join(folderPath, header.Filename)
 
+	// Check if directory exists, Create directory if needed
+	if err := os.MkdirAll(filepath.Dir(fullPath), os.ModePerm); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create directory: "+err.Error())
+		return
+	}
+
+	// Prevent overwriting
+	if _, err := os.Stat(fullPath); err == nil {
+		writeError(w, http.StatusConflict, "file already exists")
+		return
+	}
+
+	// Creating a the uploaded file
 	dst, err := os.Create(fullPath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create file: %v", err))
