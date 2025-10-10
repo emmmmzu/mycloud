@@ -180,7 +180,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// Check if directory exists, Create directory if needed
 	if err := os.MkdirAll(filepath.Dir(fullPath), os.ModePerm); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create directory: "+err.Error())
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create directory: %v", err))
 		return
 	}
 
@@ -211,4 +211,41 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		"size":     header.Size,
 	})
 
+}
+
+// Downloads a file
+func handleDownload(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "missing 'path' query parameter")
+		return
+	}
+
+	fullPath, errPath := safeFolderPath(RootFolder, path)
+	if errPath != nil {
+		writeError(w, http.StatusForbidden, "invalid path")
+		return
+	}
+
+	// Open the file
+	file, err := os.Open(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeError(w, http.StatusNotFound, "file not found")
+		} else {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to open file: %v", err))
+		}
+		return
+	}
+	defer file.Close()
+
+	// Set headers for download
+	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(fullPath))
+	w.Header().Set("Content-Type", "application/octet-stream")
+
+	// Serve the file content
+	if _, err := io.Copy(w, file); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to send file: %v", err))
+		return
+	}
 }
