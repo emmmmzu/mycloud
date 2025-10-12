@@ -271,28 +271,26 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := os.Stat(fullPath)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "path does not exist")
-	}
-
 	info, err := os.Stat(fullPath)
-
 	if err != nil {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("file or folder not found: %v", err))
+		if os.IsNotExist(err) {
+			writeError(w, http.StatusNotFound, "path does not exist")
+		} else {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to acess path: %v", err))
+		}
 		return
 	}
 
 	if info.IsDir() {
-		err := os.RemoveAll(fullPath)
+		err := os.RemoveAll(fullPath) // Removes Folder and all Files and Folders inside of it
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Path Error: %v", err))
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to delete folder: %v", err))
 			return
 		}
 	} else {
-		err := os.Remove(fullPath)
+		err := os.Remove(fullPath) // Removes File
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Path Error: %v", err))
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to delete file: %v", err))
 			return
 		}
 	}
